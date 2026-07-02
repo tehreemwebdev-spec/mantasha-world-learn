@@ -3,10 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mantasha World Learn</title>
+<title>Mantasha World Learn — AI Tutor in Your Own Language</title>
+<meta name="description" content="World's most affordable AI tutor. Learn any subject — Physics, Chemistry, Math, Programming and more — in your own language including Hindi, Urdu, Arabic and 13+ others. Free to start.">
+<meta name="keywords" content="AI tutor, online learning, study notes, quiz generator, multilingual education, Mantasha World Learn">
+<meta name="author" content="Mantasha Tehreem">
+<meta property="og:title" content="Mantasha World Learn — AI Tutor in Your Own Language">
+<meta property="og:description" content="World's most affordable AI tutor. Learn any subject in your own language — free to start.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mantasha-world-learn.vercel.app">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Mantasha World Learn — AI Tutor in Your Own Language">
+<meta name="twitter:description" content="World's most affordable AI tutor. Learn any subject in your own language — free to start.">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://js.puter.com/v2/"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0f0c29;color:#f0f0ff;font-family:'Segoe UI',sans-serif;min-height:100vh}
@@ -20,10 +31,18 @@ const LANGS=[{code:"en",name:"English",flag:"🇬🇧"},{code:"hi",name:"Hindi",
 const SUBJECTS=["Physics","Chemistry","Biology","Mathematics","History","Geography","English","Programming","Economics","Psychology"];
 const TABS=[{id:"home",icon:"🏠",label:"Home"},{id:"tutor",icon:"🤖",label:"AI Tutor"},{id:"quiz",icon:"📝",label:"Quiz"},{id:"notes",icon:"📚",label:"Notes"}];
 async function callClaude(system,msg){
-const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system,messages:[{role:"user",content:msg}]})});
-const d=await r.json();
-return d.content.map(i=>i.text||"").join("");
+const response=await puter.ai.chat(`${system}\n\n${msg}`,{model:"claude-sonnet-4-6"});
+if(typeof response==="string")return response;
+if(response?.message?.content?.[0]?.text)return response.message.content[0].text;
+if(response?.text)return response.text;
+return String(response);
 }
+const FREE_LIMIT=5;
+function todayKey(){const d=new Date();return `usage_${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;}
+async function getUsage(){try{const v=await puter.kv.get(todayKey());return v?parseInt(v):0;}catch(e){return 0;}}
+async function incUsage(){try{await puter.kv.incr(todayKey());}catch(e){}}
+async function getPremium(){try{const v=await puter.kv.get('premium');return v==='true';}catch(e){return false;}}
+async function setPremium(){try{await puter.kv.set('premium','true');}catch(e){}}
 function App(){
 const [tab,setTab]=useState("home");
 const [lang,setLang]=useState(LANGS[0]);
@@ -38,9 +57,35 @@ const [done,setDone]=useState(false);
 const [score,setScore]=useState(0);
 const [nTopic,setNTopic]=useState("");
 const [notes,setNotes]=useState("");
+const [isPremium,setIsPremium]=useState(false);
+const [usageLeft,setUsageLeft]=useState(FREE_LIMIT);
+const [showUpgrade,setShowUpgrade]=useState(false);
+
+React.useEffect(()=>{
+(async()=>{
+const prem=await getPremium();setIsPremium(prem);
+if(!prem){const used=await getUsage();setUsageLeft(Math.max(0,FREE_LIMIT-used));}
+})();
+},[]);
+
+async function checkAndUseCredit(){
+if(isPremium)return true;
+const used=await getUsage();
+if(used>=FREE_LIMIT){setShowUpgrade(true);return false;}
+await incUsage();
+setUsageLeft(Math.max(0,FREE_LIMIT-used-1));
+return true;
+}
+
+async function upgradeSuccess(){
+await setPremium();
+setIsPremium(true);
+setShowUpgrade(false);
+}
 
 async function ask(){
 if(!q.trim()||loading)return;
+const ok=await checkAndUseCredit();if(!ok)return;
 const question=q;setQ("");setLoading(true);
 setChat(h=>[...h,{r:"user",t:question}]);
 try{const a=await callClaude(`You are Mantasha World Learn AI tutor. Reply ONLY in ${lang.name} language. Be friendly and clear for students.`,`Subject:${subject}\nQuestion:${question}`);
@@ -49,6 +94,7 @@ setLoading(false);}
 
 async function genQuiz(){
 if(!qTopic.trim()||loading)return;
+const ok=await checkAndUseCredit();if(!ok)return;
 setLoading(true);setQuiz(null);setDone(false);setSel({});setScore(0);
 try{const raw=await callClaude(`Generate 5 MCQs in ${lang.name}. Return ONLY JSON array. No markdown.`,`Subject:${subject},Topic:${qTopic}\nFormat:[{"q":"question","options":["A","B","C","D"],"answer":"A","explanation":"why"}]`);
 const clean=raw.replace(/\`\`\`json|\`\`\`/g,"").trim();
@@ -57,6 +103,7 @@ setLoading(false);}
 
 async function genNotes(){
 if(!nTopic.trim()||loading)return;
+const ok=await checkAndUseCredit();if(!ok)return;
 setLoading(true);
 try{const n=await callClaude(`Write study notes in ${lang.name} for students. Use bullet points and clear headings.`,`Subject:${subject},Topic:${nTopic}`);
 setNotes(n);}catch(e){alert("Error!");}
@@ -77,7 +124,21 @@ return(<div style={{maxWidth:640,margin:"0 auto",paddingBottom:80}}>
 <select value={lang.code} onChange={e=>setLang(LANGS.find(l=>l.code===e.target.value))} style={{padding:"5px 10px",borderRadius:99,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.1)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>
 {LANGS.map(l=><option key={l.code} value={l.code} style={{background:"#1a1a2e"}}>{l.flag} {l.name}</option>)}</select>
 <select value={subject} onChange={e=>setSubject(e.target.value)} style={{padding:"5px 10px",borderRadius:99,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.1)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-{SUBJECTS.map(s=><option key={s} value={s} style={{background:"#1a1a2e"}}>{s}</option>)}</select></div></div>
+{SUBJECTS.map(s=><option key={s} value={s} style={{background:"#1a1a2e"}}>{s}</option>)}</select>
+{!isPremium&&(<div style={{padding:"5px 10px",borderRadius:99,background:"rgba(249,115,22,0.15)",border:"1px solid rgba(249,115,22,0.3)",fontSize:11,fontWeight:700,color:"#fb923c"}}>⚡ {usageLeft}/{FREE_LIMIT} free left</div>)}
+{isPremium&&(<div style={{padding:"5px 10px",borderRadius:99,background:"rgba(16,185,129,0.15)",border:"1px solid rgba(16,185,129,0.3)",fontSize:11,fontWeight:700,color:"#10b981"}}>👑 Premium</div>)}</div></div>
+
+{showUpgrade&&(<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
+<div style={{background:"#1a1a2e",borderRadius:20,padding:24,maxWidth:360,width:"100%",border:"1px solid rgba(249,115,22,0.3)"}}>
+<div style={{fontSize:40,textAlign:"center",marginBottom:8}}>🔒</div>
+<div style={{fontWeight:900,fontSize:20,textAlign:"center",marginBottom:6,background:"linear-gradient(135deg,#fb923c,#f472b6)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Daily Free Limit Reached</div>
+<div style={{color:"rgba(255,255,255,0.5)",fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>You've used {FREE_LIMIT} free AI actions today. Upgrade to Premium for unlimited access!</div>
+<div style={{background:"rgba(255,255,255,0.05)",borderRadius:12,padding:14,marginBottom:14,fontSize:13,lineHeight:2}}>
+✅ Unlimited AI Tutor questions<br/>✅ Unlimited quizzes & notes<br/>✅ All 16 languages<br/>✅ Priority support</div>
+<a href="https://razorpay.me/@mantasha" target="_blank" rel="noopener" onClick={()=>{setTimeout(()=>{if(confirm("Payment done? Click OK to unlock Premium.")){upgradeSuccess();}},500);}} style={{textDecoration:"none"}}>
+<div style={{background:"linear-gradient(135deg,#f97316,#ec4899)",color:"#fff",borderRadius:12,padding:14,fontWeight:800,fontSize:15,textAlign:"center",cursor:"pointer"}}>Upgrade for ₹49/month</div></a>
+<div onClick={()=>setShowUpgrade(false)} style={{textAlign:"center",marginTop:12,color:"rgba(255,255,255,0.4)",fontSize:13,cursor:"pointer"}}>Maybe later</div>
+</div></div>)}
 
 <div style={{padding:16}}>
 {tab==="home"&&(<div>
@@ -145,4 +206,4 @@ return(<div key={j} onClick={()=>!done&&setSel(s=>({...s,[i]:letter}))} style={{
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
-  </html>
+  </html> 
