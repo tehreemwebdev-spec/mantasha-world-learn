@@ -19,7 +19,12 @@ module.exports = async (req, res) => {
       receipt: 'receipt_' + Date.now(),
     });
 
-    res.status(200).json(order);
+    res.status(200).json({
+      id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: process.env.RAZORPAY_KEY_ID,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
