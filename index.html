@@ -85,6 +85,30 @@ setIsPremium(true);
 setShowUpgrade(false);
 }
 
+async function handleRazorpayPayment(){
+try{
+const res=await fetch('/api/create-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:49})});
+const order=await res.json();
+const options={
+key:order.key_id,
+amount:order.amount,
+currency:order.currency,
+name:"Mantasha World Learn",
+description:"Premium Subscription",
+order_id:order.id,
+handler:async function(response){
+const verifyRes=await fetch('/api/verify-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:response.razorpay_order_id,payment_id:response.razorpay_payment_id,signature:response.razorpay_signature})});
+const verifyData=await verifyRes.json();
+if(verifyData.verified){upgradeSuccess();}
+else{alert("Payment verification failed. Please contact support.");}
+},
+theme:{color:"#f97316"}
+};
+const rzp=new window.Razorpay(options);
+rzp.open();
+}catch(e){alert("Something went wrong. Please try again.");}
+}
+
 async function ask(){
 if(!q.trim()||loading)return;
 const ok=await checkAndUseCredit();if(!ok)return;
@@ -137,8 +161,7 @@ return(<div style={{maxWidth:640,margin:"0 auto",paddingBottom:80}}>
 <div style={{color:"rgba(255,255,255,0.5)",fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>You've used {FREE_LIMIT} free AI actions today. Upgrade to Premium for unlimited access!</div>
 <div style={{background:"rgba(255,255,255,0.05)",borderRadius:12,padding:14,marginBottom:14,fontSize:13,lineHeight:2}}>
 ✅ Unlimited AI Tutor questions<br/>✅ Unlimited quizzes & notes<br/>✅ All 16 languages<br/>✅ Priority support</div>
-<a href="https://razorpay.me/@mantasha" target="_blank" rel="noopener" onClick={()=>{setTimeout(()=>{if(confirm("Payment done? Click OK to unlock Premium.")){upgradeSuccess();}},500);}} style={{textDecoration:"none"}}>
-<div style={{background:"linear-gradient(135deg,#f97316,#ec4899)",color:"#fff",borderRadius:12,padding:14,fontWeight:800,fontSize:15,textAlign:"center",cursor:"pointer"}}>Upgrade for ₹49/month</div></a>
+<div onClick={handleRazorpayPayment} style={{background:"linear-gradient(135deg,#f97316,#ec4899)",color:"#fff",borderRadius:12,padding:14,fontWeight:800,fontSize:15,textAlign:"center",cursor:"pointer"}}>Upgrade for ₹49/month</div>
 <div onClick={()=>setShowUpgrade(false)} style={{textAlign:"center",marginTop:12,color:"rgba(255,255,255,0.4)",fontSize:13,cursor:"pointer"}}>Maybe later</div>
 </div></div>)}
 
@@ -208,4 +231,4 @@ return(<div key={j} onClick={()=>!done&&setSel(s=>({...s,[i]:letter}))} style={{
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
-  </html> 
+</html>
