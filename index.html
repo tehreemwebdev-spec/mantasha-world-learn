@@ -191,7 +191,7 @@ return(<div style={{maxWidth:640,margin:"0 auto",paddingBottom:80}}>
 <div style={{fontSize:44,marginBottom:8}}>🤖</div>
 <div style={{fontWeight:700}}>Ask anything in {lang.name}!</div></div>)}
 {chat.map((msg,i)=>(<div key={i} style={{marginBottom:12,display:"flex",justifyContent:msg.r==="user"?"flex-end":"flex-start"}}>
-<div style={{maxWidth:"82%",padding:"10px 14px",borderRadius:16,fontSize:14,lineHeight:1.7,background:msg.r==="user"?"linear-gradient(135deg,#f97316,#ec4899)":"rgba(255,255,255,0.08)"}}>{msg.t}</div></div>))}
+<div style={{maxWidth:"82%",padding:"10px 14px",borderRadius:16,fontSize:14,lineHeight:1.7,background:msg.r==="user"?"linear-gradient(135deg,#f97316,#ec4899)":"rgba(255,255,255,0.08)"}}>{msg.r==="user"?msg.t:<MD text={msg.t}/>}</div></div>))}
 {loading&&(<div style={{color:"rgba(255,255,255,0.4)",fontSize:13}}>Thinking in {lang.name}... ⏳</div>)}</div>
 <div style={{display:"flex",gap:8}}>
 <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&ask()} placeholder={`Ask about ${subject}...`} style={{flex:1,padding:"10px 14px",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:12,color:"#f0f0ff",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
